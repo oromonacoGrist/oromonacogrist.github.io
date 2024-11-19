@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <!-- A template for showing an invoice in a Custom Widget in Grist. -->
+    <!-- Uses Vue.js, moment, and the Grist Plugin API -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.3/vue.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.27.0/moment.min.js"></script>
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    <link href='https://fonts.googleapis.com/css?family=Montserrat' rel='stylesheet'>
+    <script src="https://printjs-4de6.kxcdn.com/print.min.js"></script>
+    <link href='https://printjs-4de6.kxcdn.com/print.min.css' rel='stylesheet'>
+    
+    
+    <script src="invoice.js?ver=11"></script>
+    <script src="exampleData.js"></script>
+
+    <link rel="stylesheet" href="invoice.css?ver=17">
+  </head>
+  <body>
+    <div id="app">
+      <div class="status" v-if="status">
+        <template v-if="status === 'waiting'">
+          <p>Waiting for data...</p>
+          <ul>
+            <li v-bind:class="[tableConnected ? 'done' : '']">I need <b>read table</b> access.</li>
+            <li v-bind:class="[haveRows ? 'done' : '']">I need at least one row of data.</li>
+            <li v-bind:class="[rowConnected ? 'done' : '']">I need <b>Select By</b> set.</li>
+          </ul>
+          <p>Examples:</p>
+          <ul>
+            <li><a class="button" href="index.html?demo=1">A filled out invoice</a></li>
+            <li><a class="button" href="index.html?labels=1">A labelled invoice</a></li>
+          </ul>
+        </template>
+        <template v-else>
+          {{ status }}
+        </template>
+      </div>
+      <template v-if="invoice">
+        <div class="top">
+          <div class="supplier" style="text-align: left;" >
+            <img style="margin-left: -4%; margin-bottom: 2%;" src="LOGO_WHITE.png" width="250" />
+            <div v-for="business in (invoice.Invoicer ? [invoice.Invoicer] : [])" style=" display: flex;flex-direction: column; gap:5px;">
+              <template v-if="typeof(business) === 'string'">
+                <div class="address newlined">{{ business }}</div>
+              </template>
+              <template v-else>
+                <div class="address" style="display: flex;flex-direction: column; gap: 5px;">
+                  <div style="font-size: 15px;" class="phone">Phone: +1 (929) 412-1914</div>
+                  <div style="font-size: 15px;" class="phone">Whatsapp: +1 (929) 384-3737</div>
+                  <div style="font-size: 15px;" class="email">info@oromonaco.com</div>
+                  <div style="font-size: 15px;" class="website"><a v-bind:href="business.Url" style="text-transform: none;">oromonaco.com</a></div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="block">
+            <div style="margin-top: 64px;">
+              <div class="meta title">Invoice</div>
+              <div class="info"><span class="meta">ORDER NO</span> #{{ invoice.Number }}</div>
+              <div class="info" v-if="invoice.Issued"><div class="meta date-tag">ORDER DATE</div>{{ invoice.Date | asDate }}</div>
+            </div>
+            <div class="client" v-for="business in (invoice.Client ? [invoice.Client] : [])" style="margin-bottom: 15%;"> 
+              <div class="title" style="margin-left: 0;">Client</div>
+              <div class="details" style="display: flex; flex-direction: column; gap: 5px; font-size:15px; padding: 0;">
+                <template v-if="typeof(business) === 'string'">
+                  <div class="newlined">{{ business }}</div>
+                </template>
+                <template v-else>
+                  <div>{{ business.Contact_Name }}</div>
+                  <div>{{ business.Business_Name }}</div>
+                  <template v-if="business.Street1">
+                    {{ business.Address_1 }},
+                  </template>
+                  <template v-if="business.Street2">
+                    {{ business.Address_2 }},
+                  </template>
+                 <span>{{ business.City }}, {{ business.State }}, {{ business.Zip_Code }}</span> 
+                  <template v-if="business.Country">
+                    <span>{{ business.Country }}</span>
+                  </template>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+
+
+        <table class="items">
+          <template v-if="!Array.isArray(invoice.Items)">
+            <tr>
+              <th>Description</th>
+              <th class="money">Total</th>
+            </tr>
+            <tr>
+              <td>{{ invoice.Items }}</td>
+              <td class="money">{{ invoice.Total | currency }}</td>
+            </tr>
+          </template>
+          <template v-else>
+            <tr>
+              <th style="font-weight: bold;">IMG</th>
+              <th style="font-weight: bold;" class="number">KARAT</th>
+              <th style="font-weight: bold;">Description</th>
+              <th style="font-weight: bold;">TYPE</th>
+              <th style="font-weight: bold;" class="number">PCS</th>
+              <th style="font-weight: bold;" class="number">WEIGHT (GR)</th>              
+              <th style="font-weight: bold;" class="number">STATUS</th>
+            </tr>
+            <tr v-for="(item, index) in invoice.Items">
+              <td class="img" style="padding:4px;">
+                <img :class="'img-' + index" :style="item.Type === 'Ring' || item.Type === 'Earring' ? 'height: 110px;' : ''" />
+              <td class="number">{{ item.Karat }}</td>
+              <td class="item-t" style="padding:5px;">{{ item.Description }}  <br><br>
+                <small v-if="item.Type === 'Ring'" style="font-size: 12px; font-weight: bold;">
+                  {{ item.options }}
+                </small>
+                <small v-else-if="item.Type !== 'Ring' && item.Type !== 'Earring' && item.Type !== 'Half Set' && item.Type !== 'Pendant'" style="font-size: 12px; font-weight: bold;">
+                  {{ optionsList(item)[0] }} | {{ optionsList(item)[1] }}
+                </small>
+              <td class="item-t" id="type">{{ item.Type }}</td>
+              <td class="number">{{ item.Quantity }}</td>
+              <td class="money">{{ item.Weight }}</td>
+              <td class="money">{{ item.Total | currency }}</td>
+            </tr>
+          </template>
+        </table>
+
+<div class="overview-grid" v-for="(overview, index) in Object.entries(groupedItems)" :key="index" :style="{ border: `1px solid ${borderColors[index % borderColors.length]}` }">
+  <div class="overview-item single">
+    <div class="overview-title" style="width: 770px;">{{ overview[0] }} OVERVIEW</div>
+    <div class="overview-items">TOTAL WEIGHT (gr) <span>{{ overview[1].totalWeight | round }}</span></div>
+    <div class="overview-items last">{{ overview[0] }} TOTAL PRICE <span>{{ overview[1].totalPrice | currency }}</span></div>
+  </div>
+  <table class="overview-item single" style="font-size: 14px; margin-top: 1%;">
+    <thead>
+      <tr>
+        <th></th>
+        <th></th>
+        <th style="padding-right: 5px;">QTY</th>
+        <th style="padding-right: 0;">WEIGHT</th>
+      </tr>
+    </thead>
+    <tbody style="line-height: 8.15px;">
+      <tr>
+        <td>Necklaces</td>
+        <td></td>
+        <td>{{ overview[1].NecklaceQty }}</td>
+        <td style="padding-right: 0;">{{ overview[1].NecklaceWeight | round }}</td>
+      </tr>
+      <tr>
+        <td>Bracelets</td>
+        <td></td>
+        <td>{{ overview[1].BraceletQty }}</td>
+        <td style="padding-right: 0;">{{ overview[1].BraceletWeight | round }}</td>
+      </tr>
+      <tr>
+        <td>Anklets</td>
+        <td></td>
+        <td>{{ overview[1].AnkletQty }}</td>
+        <td style="padding-right: 0;">{{ overview[1].AnkletWeight | round }}</td>
+      </tr>
+      <tr>
+        <td>Rings</td>
+        <td></td>
+        <td>{{ overview[1].RingQty }} </td>
+        <td style="padding-right: 0;">{{ overview[1].RingWeight | round }} </td>
+      </tr>
+      <tr>
+        <td>Earrings</td>
+        <td></td>
+        <td>{{ overview[1].EarringQty }}</td>
+        <td style="padding-right: 0;">{{ overview[1].EarringWeight | round }}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="height: 18px;">
+        <td colspan="2" style="padding-left: 0; padding-top: 2px;">TOTAL</td>
+        <td style="padding-right: 8px; padding-top: 2px; padding-left: 8px;">{{ overview[1].totalQty }}</td>
+        <td style="padding-right: 0; padding-top: 2px; padding-left: 8px;">{{ overview[1].totalWeight | round }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+        <div class="overview grand" style="width: 800px;">
+          <div class="overview-title">INVOICE GRAND TOTAL</div>
+          <div class="overview-items grand">GRAND TOTAL WEIGHT (gr) <span> {{ grandTotalWeight | round }} </span></div>
+          <div class="overview-items grand">SHIPPING FEE <span>{{ invoice.Shipping_Cost | currency }} </span></div>
+          <div class="overview-items grand last">GRAND TOTAL PRICE <span>{{ grandTotalPrice | currency }} </span></div>
+        </div>
+        <div class="print">
+          <a href="javascript:window.print()">Print</a>
+        </div>
+        <div class="print">
+          <button @click="retryLoadingImagesWithButton" style="position: fixed;
+          left: 2%;
+          top: 5%;
+          display: block;
+          background-color: black;
+          font-size: 14px;
+          text-transform: uppercase;
+          color: white;
+          font-weight: bold;
+          height: 35px;">Retry Loading Images</button>
+        </div>
+      
+      </template>
+    </div>
+  </body>
+</html>
+
+
+
